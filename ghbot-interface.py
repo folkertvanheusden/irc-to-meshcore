@@ -4,19 +4,17 @@ meshcore_host = '192.168.65.96'  # '10.208.3.122'
 meshcore_port = 5000
 meshcore_channel_nr = 1  # index, see configure.py
 meshcore_channel_name = 'nurds'  # see configure.py
-mqtt_server = 'mqtt.vm.nurd.space'
-mqtt_topic_publish = 'GHBot/to/irc/nurdsmc/notice'
-mqtt_topic_receive = 'GHBot/from/irc/nurdsmc/+/message'
 
 ###
 
-import aiomqtt
+from asyncirc.protocol import IrcProtocol
+from asyncirc.server import Server
+
 import argparse
 import asyncio
 
 from meshcore import MeshCore
 from meshcore.events import EventType
-
 
 meshcore = None
 async def message_callback(event):
@@ -31,16 +29,14 @@ async def message_callback(event):
     print(event)
 
     if meshcore_channel_name.lower() in channel.lower():
-        async with aiomqtt.Client(mqtt_server) as client:
-            text = event.payload['text']
-            parts = text.split()
-            if len(parts) >= 2:
-                if len(parts[1]) > 1 and parts[1][0] == '!':
-                    await client.publish(mqtt_topic_publish, payload=text[text.find(' '):].strip())  # handle by bot
-                else:
-                    await client.publish(mqtt_topic_publish, payload='MeshCore: ' + text)
+        text = event.payload['text']
+        parts = text.split()
+        if len(parts) >= 2:
+            if len(parts[1]) > 1 and parts[1][0] == '!':
+                await client.publish(mqtt_topic_publish, payload=text[text.find(' '):].strip())  # handle by bot
+            else:
+                await client.publish(mqtt_topic_publish, payload='MeshCore: ' + text)
 
-    await meshcore.commands.send_advert(flood=True)
     print()
 
 
@@ -61,9 +57,20 @@ async def mqtt_handler():
                 print(f'mqtt_handler: {e}')
 
 
+async def capture_irc(conn, msg):
+    print(msg)
+
+
 async def main():
     global meshcore
     meshcore = await MeshCore.create_tcp(meshcore_host, meshcore_port, auto_reconnect=True, max_reconnect_attempts=100000)
+
+    global ic
+    aloop = asyncio.get_event_loop()
+    ic = IrcProtocol([ Server('irc.oftc.net', 6667) ], 'nurdcore', loop=aloop)
+    ic.register_cap('userhost-in-names')
+    ic.register('*', capture_irc)
+    await ic.connect()
 
     await meshcore.commands.send_advert(flood=True)
 
@@ -74,7 +81,8 @@ async def main():
     await meshcore.start_auto_message_fetching()
 
     try:
-        await mqtt_handler()
+        while True:
+            await asyncio.sleep(1.)
     except KeyboardInterrupt:
         meshcore.stop()
         print()
