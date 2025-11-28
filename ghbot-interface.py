@@ -7,8 +7,7 @@ meshcore_channel_name = 'nurds'  # see configure.py
 
 ###
 
-from asyncirc.protocol import IrcProtocol
-from asyncirc.server import Server
+import pydle
 
 import argparse
 import asyncio
@@ -17,6 +16,35 @@ from meshcore import MeshCore
 from meshcore.events import EventType
 
 meshcore = None
+q = asyncio.Queue()
+
+
+class MyOwnBot(pydle.Client):
+    async def on_connect(self):
+         await self.join('#nurdsmc')
+
+
+    async def on_message(self, target, source, message):
+        global q
+        print(target, source, message)
+        try:
+            await q.put(f'{source} ({target}): {message}')
+        except Exception as e:
+            print(f'on_message: {e}')
+
+
+    async def on_private_message(self, target, source, message):
+        global q
+        print(target, source, message)
+        try:
+            await q.put(f'{source} ({target}): {message}')
+        except Exception as e:
+            print(f'on_private_message: {e}')
+
+
+ic = MyOwnBot('nurdcore', realname='This is a NURDspace bot')
+
+
 async def message_callback(event):
     print(f"Received message: {event.payload['text']}")
     print(f"From: {event.payload.get('pubkey_prefix', 'channel')}")
@@ -33,28 +61,15 @@ async def message_callback(event):
         parts = text.split()
         if len(parts) >= 2:
             if len(parts[1]) > 1 and parts[1][0] == '!':
-                await client.publish(mqtt_topic_publish, payload=text[text.find(' '):].strip())  # handle by bot
+                await ic.message('#nurdsmc', text[text.find(' '):].strip())  # handle by nurdbot
             else:
-                await client.publish(mqtt_topic_publish, payload='MeshCore: ' + text)
+                await ic.message('#nurdsmc', 'MeshCore: ' + text)
 
     print()
 
 
 async def advertisement_callback(event):
     print(f'Detected advertisement: {event}')
-
-
-async def mqtt_handler():
-    async with aiomqtt.Client(mqtt_server) as client:
-        await client.subscribe(mqtt_topic_receive)
-        async for message in client.messages:
-            print(f'mqtt: {message.payload} to {meshcore_channel_nr}')
-            try:
-                await meshcore.commands.send_chan_msg(meshcore_channel_nr, message.payload.decode('ascii'))
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f'mqtt_handler: {e}')
 
 
 async def capture_irc(conn, msg):
@@ -65,13 +80,6 @@ async def main():
     global meshcore
     meshcore = await MeshCore.create_tcp(meshcore_host, meshcore_port, auto_reconnect=True, max_reconnect_attempts=100000)
 
-    global ic
-    aloop = asyncio.get_event_loop()
-    ic = IrcProtocol([ Server('irc.oftc.net', 6667) ], 'nurdcore', loop=aloop)
-    ic.register_cap('userhost-in-names')
-    ic.register('*', capture_irc)
-    await ic.connect()
-
     await meshcore.commands.send_advert(flood=True)
 
     private_subscription = meshcore.subscribe(EventType.CONTACT_MSG_RECV, message_callback)
@@ -80,15 +88,19 @@ async def main():
 
     await meshcore.start_auto_message_fetching()
 
+    await ic.connect('irc.oftc.net', tls=True, tls_verify=True)
+
     try:
         while True:
-            await asyncio.sleep(1.)
+            print('Waiting for message...')
+            m = await q.get()
+            print(f'Send via meshcore to channel {meshcore_channel_nr}: {m}')
+            await meshcore.commands.send_chan_msg(meshcore_channel_nr, m)
     except KeyboardInterrupt:
         meshcore.stop()
         print()
         print('Exiting...')
     except asyncio.CancelledError:
-        # Handle task cancellation from KeyboardInterrupt in asyncio.run()
         print()
         print('Task cancelled - cleaning up...')
     finally:
