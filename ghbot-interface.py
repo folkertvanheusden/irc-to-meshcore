@@ -1,11 +1,12 @@
 #! /usr/bin/env python3
 
-meshcore_host = '10.208.3.122'
+meshcore_host = '192.168.65.96'  # '10.208.3.122'
 meshcore_port = 5000
-meshcore_channel = 'nurds'
+meshcore_channel_nr = 1  # index, see configure.py
+meshcore_channel_name = 'nurds'  # see configure.py
 mqtt_server = 'mqtt.vm.nurd.space'
 mqtt_topic_publish = 'GHBot/to/irc/nurdsmc/notice'
-mqtt_topic_receive = 'GHBot/to/irc/nurdsmc/PRIVMSG'  # TODO
+mqtt_topic_receive = 'GHBot/from/irc/nurdsmc/+/message'
 
 ###
 
@@ -26,18 +27,21 @@ async def message_callback(event):
     channel = ''
     if event.payload['type'] == 'CHAN':
         channel = (await meshcore.commands.get_channel(event.payload['channel_idx'])).payload['channel_name']
-        print(channel)
+        print(f'CHANNEL: {channel}')
     print(event)
-    print()
 
-    if 'nurds' in channel.lower():
+    if meshcore_channel_name.lower() in channel.lower():
         async with aiomqtt.Client(mqtt_server) as client:
             text = event.payload['text']
-            if len(text) > 0:
-                if text[0] == '!':
-                    await client.publish(mqtt_topic_publish, payload=text)  # handle by bot
+            parts = text.split()
+            if len(parts) >= 2:
+                if len(parts[1]) > 1 and parts[1][0] == '!':
+                    await client.publish(mqtt_topic_publish, payload=text[text.find(' '):].strip())  # handle by bot
                 else:
                     await client.publish(mqtt_topic_publish, payload='MeshCore: ' + text)
+
+    await meshcore.commands.send_advert(flood=True)
+    print()
 
 
 async def advertisement_callback(event):
@@ -48,8 +52,13 @@ async def mqtt_handler():
     async with aiomqtt.Client(mqtt_server) as client:
         await client.subscribe(mqtt_topic_receive)
         async for message in client.messages:
-            print(message.payload)
-            await meshcore.commands.send_chan_msg(meshcore_channel, message.payload)
+            print(f'mqtt: {message.payload} to {meshcore_channel_nr}')
+            try:
+                await meshcore.commands.send_chan_msg(meshcore_channel_nr, message.payload.decode('ascii'))
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                print(f'mqtt_handler: {e}')
 
 
 async def main():
@@ -65,7 +74,7 @@ async def main():
     await meshcore.start_auto_message_fetching()
 
     try:
-        mqtt_handler()
+        await mqtt_handler()
     except KeyboardInterrupt:
         meshcore.stop()
         print()
