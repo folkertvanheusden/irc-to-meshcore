@@ -24,22 +24,25 @@ class MyOwnBot(pydle.Client):
          await self.join('#nurdsmc')
 
 
-    async def on_message(self, target, source, message):
+    async def queue_msg(self, target, source, message):
         global q
         print(target, source, message)
         try:
             await q.put(f'{source} ({target}): {message}')
-        except Exception as e:
+        except exception as e:
             print(f'on_message: {e}')
 
 
+    async def on_message(self, target, source, message):
+        await self.queue_msg(target, source, message)
+
+
     async def on_private_message(self, target, source, message):
-        global q
-        print(target, source, message)
-        try:
-            await q.put(f'{source} ({target}): {message}')
-        except Exception as e:
-            print(f'on_private_message: {e}')
+        await self.queue_msg(target, source, message)
+
+
+    async def on_notice(self, target, source, message):
+        await self.queue_msg(target, source, message)
 
 
 ic = MyOwnBot('nurdcore', realname='This is a NURDspace bot')
