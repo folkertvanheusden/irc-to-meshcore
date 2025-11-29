@@ -5,9 +5,9 @@ import time
 from meshcore import MeshCore, EventType
 
 async def main():
-    #meshcore = await MeshCore.create_tcp("10.208.3.122", 5000)
+    meshcore = await MeshCore.create_tcp("10.208.3.122", 5000)
     #meshcore = await MeshCore.create_tcp("192.168.2.34", 5000)
-    meshcore = await MeshCore.create_tcp("192.168.65.96", 5000)
+    #meshcore = await MeshCore.create_tcp("192.168.65.96", 5000)
     
     result = await meshcore.commands.set_name('NURDspace')
     if result.type == EventType.ERROR:

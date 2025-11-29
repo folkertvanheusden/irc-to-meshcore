@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-meshcore_host = '192.168.65.96'  # '10.208.3.122'
+meshcore_host = '10.208.3.122'
 meshcore_port = 5000
 meshcore_channel_nr = 1  # index, see configure.py
 meshcore_channel_name = 'nurds'  # see configure.py
