@@ -4,6 +4,10 @@ meshcore_host = '192.168.65.96'  # '10.208.3.122'
 meshcore_port = 5000
 meshcore_channel_nr = 1  # index, see configure.py
 meshcore_channel_name = 'nurds'  # see configure.py
+irc_channel = '#nurdsmc'
+irc_server = 'irc.oftc.net'
+irc_nick = 'nurdcore'
+irc_name = 'NURDspace IRC bot'
 
 ###
 
@@ -21,7 +25,7 @@ q = asyncio.Queue()
 
 class MyOwnBot(pydle.Client):
     async def on_connect(self):
-         await self.join('#nurdsmc')
+         await self.join(irc_channel)
 
 
     async def queue_msg(self, target, source, message):
@@ -45,7 +49,7 @@ class MyOwnBot(pydle.Client):
         await self.queue_msg(target, source, message)
 
 
-ic = MyOwnBot('nurdcore', realname='This is a NURDspace bot')
+ic = MyOwnBot(irc_nick, realname=irc_name)
 
 
 async def message_callback(event):
@@ -64,9 +68,9 @@ async def message_callback(event):
         parts = text.split()
         if len(parts) >= 2:
             if len(parts[1]) > 1 and parts[1][0] == '!':
-                await ic.message('#nurdsmc', text[text.find(' '):].strip())  # handle by nurdbot
+                await ic.message(irc_channel, text[text.find(' '):].strip())  # handle by nurdbot
             else:
-                await ic.message('#nurdsmc', 'MeshCore: ' + text)
+                await ic.message(irc_channel, 'MeshCore: ' + text)
 
     print()
 
@@ -91,7 +95,7 @@ async def main():
 
     await meshcore.start_auto_message_fetching()
 
-    await ic.connect('irc.oftc.net', tls=True, tls_verify=True)
+    await ic.connect(irc_server, tls=True, tls_verify=True)
 
     try:
         while True:
