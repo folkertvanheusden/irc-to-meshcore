@@ -87,6 +87,7 @@ async def main():
     global meshcore
     meshcore = await MeshCore.create_tcp(meshcore_host, meshcore_port, auto_reconnect=True, max_reconnect_attempts=100000)
 
+    print('Send advert')
     await meshcore.commands.send_advert(flood=True)
 
     private_subscription = meshcore.subscribe(EventType.CONTACT_MSG_RECV, message_callback)
@@ -100,9 +101,13 @@ async def main():
     try:
         while True:
             print('Waiting for message...')
-            m = await q.get()
-            print(f'Send via meshcore to channel {meshcore_channel_nr}: {m}')
-            await meshcore.commands.send_chan_msg(meshcore_channel_nr, m)
+            try:
+                m = await asyncio.wait_for(q.get(), 30.)
+                print(f'Send via meshcore to channel {meshcore_channel_nr}: {m}')
+                await meshcore.commands.send_chan_msg(meshcore_channel_nr, m)
+            except TimeoutError:
+                print('Send advert')
+                await meshcore.commands.send_advert(flood=True)
     except KeyboardInterrupt:
         meshcore.stop()
         print()
