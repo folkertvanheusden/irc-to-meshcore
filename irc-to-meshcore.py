@@ -8,6 +8,7 @@ irc_channel = '#nurdsmc'
 irc_server = 'irc.oftc.net'
 irc_nick = 'nurdcore'
 irc_name = 'NURDspace IRC bot'
+irc_bot_trigger = '!'
 
 ###
 
@@ -67,7 +68,7 @@ async def message_callback(event):
         text = event.payload['text']
         parts = text.split()
         if len(parts) >= 2:
-            if len(parts[1]) > 1 and parts[1][0] == '!':
+            if len(parts[1]) > 1 and parts[1][0] == irc_bot_trigger:
                 await ic.message(irc_channel, text[text.find(' '):].strip())  # handle by nurdbot
             else:
                 await ic.message(irc_channel, 'MeshCore: ' + text)
