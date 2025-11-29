@@ -9,7 +9,7 @@ async def main():
     #meshcore = await MeshCore.create_tcp("192.168.2.34", 5000)
     meshcore = await MeshCore.create_tcp("192.168.65.96", 5000)
     
-    result = await meshcore.commands.set_name('HS-Gouda')
+    result = await meshcore.commands.set_name('NURDspace')
     if result.type == EventType.ERROR:
         print('failed')
         return
