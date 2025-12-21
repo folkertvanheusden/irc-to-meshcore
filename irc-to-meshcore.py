@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-meshcore_host = '10.208.3.122'
+meshcore_host = 'esp32-8877cc.dhcp.nurd.space'  # 10.208.3.122'
 meshcore_port = 5000
 meshcore_channel_nr = 1  # index, see configure.py
 meshcore_channel_name = 'nurds'  # see configure.py
@@ -13,7 +13,7 @@ irc_bot_trigger = '!'
 ###
 
 import pydle
-
+import time
 import argparse
 import asyncio
 
@@ -58,11 +58,15 @@ async def message_callback(event):
     print(f"From: {event.payload.get('pubkey_prefix', 'channel')}")
     print(f"Type: {event.payload['type']}")
     print(f"Timestamp: {event.payload['sender_timestamp']}")
-    channel = ''
+    channel = '-'
     if event.payload['type'] == 'CHAN':
         channel = (await meshcore.commands.get_channel(event.payload['channel_idx'])).payload['channel_name']
         print(f'CHANNEL: {channel}')
     print(event)
+    try:
+        open('log.dat', 'a+').write(f"{time.ctime()}|{event.payload.get('pubkey_prefix', 'channel')}|{event.payload['type']}|{channel}|{event.payload['sender_timestamp']}|{event.payload['path_len']}|{event.payload['text']}\n")
+    except Exception as e:
+        print(f'Cannot access logfile: {e}')
 
     if meshcore_channel_name.lower() in channel.lower():
         text = event.payload['text']
@@ -103,12 +107,12 @@ async def main():
         while True:
             print('Waiting for message...')
             try:
-                m = await asyncio.wait_for(q.get(), 30.)
+                m = await asyncio.wait_for(q.get(), 3600.)
                 print(f'Send via meshcore to channel {meshcore_channel_nr}: {m}')
                 await meshcore.commands.send_chan_msg(meshcore_channel_nr, m)
             except TimeoutError:
                 print('Send advert')
-                await meshcore.commands.send_advert(flood=True)
+                await meshcore.commands.send_advert(flood=False)
     except KeyboardInterrupt:
         meshcore.stop()
         print()
